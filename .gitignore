@@ -1,0 +1,74 @@
+# ─────────────────────────────────────────────────────────────
+#  GameKey Store — .gitignore
+#  Файлы, которые НЕ должны попадать в репозиторий.
+#  Коммитятся: *.env.example, package-lock.json, Dockerfile, docker-compose.yml
+# ─────────────────────────────────────────────────────────────
+
+# ── Node.js ───────────────────────────────────────────────────
+node_modules/
+.pnp
+.pnp.js
+.yarn/cache/
+.yarn/unplugged/
+
+# ── Сборка / артефакты ───────────────────────────────────────
+dist/
+build/
+coverage/
+.nyc_output/
+
+# ── Nuxt / Vue ────────────────────────────────────────────────
+.nuxt/
+.output/
+.nitro/
+.data/
+.cache/
+*.tsbuildinfo
+
+# ── Логи ──────────────────────────────────────────────────────
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ── Переменные окружения (НЕ коммитим .env, но коммитим .env.example) ──
+.env
+.env.*
+!.env.example
+!.env.example.*
+.env.local
+.env.*.local
+
+# ── Тесты ─────────────────────────────────────────────────────
+# (временные артефакты смоуков/репортов)
+.playwright/
+test-results/
+allure-results/
+
+# ── Операционная система ──────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+Desktop.ini
+
+# ── IDE / редакторы ───────────────────────────────────────────
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+*.swo
+*~
+
+# ── Прочее ────────────────────────────────────────────────────
+claude-run.log
+*.local
