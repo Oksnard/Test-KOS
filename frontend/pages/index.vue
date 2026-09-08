@@ -20,6 +20,7 @@
 </template>
 
 <script setup lang="ts">
+import { onMounted, onBeforeUnmount } from 'vue';
 import { storeToRefs } from 'pinia';
 import Header from '~/components/Header.vue';
 import BannerCarousel from '~/components/BannerCarousel.vue';
@@ -31,8 +32,11 @@ import Footer from '~/components/Footer.vue';
 import OrderModal from '~/components/OrderModal.vue';
 import type { Product } from '~/composables/api';
 import { useOrderStore } from '~/stores/order';
+import { useProductsStore } from '~/stores/products';
+import { onBookingUpdate } from '~/composables/websocket';
 
 const orderStore = useOrderStore();
+const productsStore = useProductsStore();
 const { order, productName, showModal, error } = storeToRefs(orderStore);
 
 function buy(product: Product) {
@@ -42,4 +46,57 @@ function buy(product: Product) {
 function simulatePayment() {
   orderStore.pay().catch(() => {});
 }
+
+/**
+ * Слушаем обновления бронирования из WebSocket.
+ * Обновляем таймер в реальном времени.
+ */
+function setupBookingListener() {
+  const unsubscribe = onBookingUpdate((data) => {
+    if (orderStore.order && orderStore.order.orderNumber) {
+      // Проверяем, относится ли бронирование к текущему заказу
+      if (data.orderId === orderStore.order?.id) {
+        if (data.status === 'expired' || data.status === 'cancelled') {
+          orderStore.bookingRemainingMs = 0;
+          orderStore.error = 'Время брони истекло. Товар снова доступен.';
+        } else if (data.remainingMs !== undefined) {
+          orderStore.bookingRemainingMs = data.remainingMs;
+        }
+      }
+    }
+  });
+
+  onBeforeUnmount(() => {
+    unsubscribe();
+  });
+}
+
+/**
+ * При уходе со страницы — отменяем бронь.
+ * Используем beforeunload для надёжности.
+ */
+function setupBeforeUnload() {
+  function handleBeforeUnload() {
+    if (orderStore.order && orderStore.order.status === 'created') {
+      orderStore.cancelCurrentBooking();
+    }
+  }
+
+  onMounted(() => {
+    window.addEventListener('beforeunload', handleBeforeUnload);
+  });
+
+  onBeforeUnmount(() => {
+    window.removeEventListener('beforeunload', handleBeforeUnload);
+    // Отменяем бронь при уходе
+    if (orderStore.order && orderStore.order.status === 'created') {
+      orderStore.cancelCurrentBooking();
+    }
+  });
+}
+
+onMounted(() => {
+  setupBookingListener();
+  setupBeforeUnload();
+});
 </script>

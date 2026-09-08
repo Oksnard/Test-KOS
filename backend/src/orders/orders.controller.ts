@@ -10,10 +10,18 @@ import {
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
+import { BookingsService } from '../bookings/bookings.service';
+import { ShowroomGateway } from '../products/products.gateway';
+import { ProductsService } from '../products/products.service';
 
 @Controller('api')
 export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) {}
+  constructor(
+    private readonly ordersService: OrdersService,
+    private readonly bookingsService: BookingsService,
+    private readonly showroomGateway: ShowroomGateway,
+    private readonly productsService: ProductsService,
+  ) {}
 
   @Post('orders')
   async createOrder(@Body() body: CreateOrderDto) {
@@ -23,7 +31,22 @@ export class OrdersController {
       body.userIp,
       body.promoCode,
     );
-    return { order, message: 'Order created' };
+
+    // Создаём бронь на товар
+    const booking = await this.bookingsService.create(order.id, body.productId, 300);
+
+    return {
+      order,
+      message: 'Order created',
+      booking: booking
+        ? {
+            id: booking.id,
+            orderId: booking.orderId,
+            expiresAt: booking.expiresAt.toISOString(),
+            remainingMs: this.bookingsService.getRemainingMs(booking),
+          }
+        : null,
+    };
   }
 
   @Get('orders/:orderNumber')

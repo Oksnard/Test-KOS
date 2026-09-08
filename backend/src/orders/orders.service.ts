@@ -7,6 +7,8 @@ import { WebhookEvent } from '../database/entities/webhook-event.entity';
 import { DeliveryLog } from '../database/entities/delivery-log.entity';
 import { ProductsService } from '../products/products.service';
 import { PromoCodesService } from '../promo-codes/promo-codes.service';
+import { BookingsService } from '../bookings/bookings.service';
+import { ShowroomGateway } from '../products/products.gateway';
 import { v4 as uuidv4 } from 'uuid';
 
 interface SupplierResult {
@@ -30,6 +32,8 @@ export class OrdersService {
     private deliveryLogRepo: Repository<DeliveryLog>,
     private productsService: ProductsService,
     private promoCodesService: PromoCodesService,
+    private bookingsService: BookingsService,
+    private readonly showroomGateway: ShowroomGateway,
   ) {}
 
   async createOrder(
@@ -61,16 +65,12 @@ export class OrdersService {
       });
     };
 
-    // Без промокода — простая вставка, как раньше.
+    // Без промокода — простая вставка
     if (!promoCode) {
       return this.orderRepo.save(buildOrder(0, undefined));
     }
 
-    // Промокод: расход и создание заказа в ОДНОЙ транзакции. Скидку считает
-    // только сервер: сумма берётся из discountPercent промокода в БД (не из
-    // запроса клиента). consume() атомарно блокирует строку промокода, поэтому
-    // под параллельными запросами лимит не превышается; при исчерпании
-    // транзакция откатывается и заказ не создаётся.
+    // Промокод: расход и создание заказа в ОДНОЙ транзакции
     const queryRunner = this.orderRepo.manager.connection.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -99,11 +99,6 @@ export class OrdersService {
     return this.attachKeyValue(order);
   }
 
-  /**
-   * Клиент показывает выданный ключ из поля assignedKeyValue,
-   * но сама сущность Order хранит только assignedKeyId.
-   * Подмешиваем значение ключа из KeyPool в объект ответа.
-   */
   private async attachKeyValue<T extends Order | null>(order: T): Promise<T> {
     if (order && order.assignedKeyId) {
       const key = await this.keyPoolRepo.findOne({
@@ -123,9 +118,6 @@ export class OrdersService {
     await queryRunner.startTransaction();
 
     try {
-      // Lock order first: сериализует параллельные вебхуки с одним
-      // event_id — только первый поток обрабатывает событие, остальные
-      // дождутся коммита и уйдут по идемпотентной ветке ниже.
       const order = await queryRunner.manager
         .getRepository(Order)
         .createQueryBuilder()
@@ -137,11 +129,6 @@ export class OrdersService {
         throw new Error('ORDER_NOT_FOUND');
       }
 
-      // Idempotency: проверка ПОСЛЕ lock заказа, чтобы параллельные вебхуки с
-      // одним event_id сериализовались (без гонки INSERT в UNIQUE "eventId").
-      // Событие со статусом 'pending' означает, что webhook пришёл раньше
-      // заказа (deferred): доставка ещё не производилась, поэтому его НЕ
-      // считаем обработанным и продолжаем — иначе платёж был бы потерян.
       const existingEvent = await queryRunner.manager
         .getRepository(WebhookEvent)
         .findOne({ where: { eventId } });
@@ -152,8 +139,6 @@ export class OrdersService {
         return this.attachKeyValue(order);
       }
 
-      // Фиксируем событие один раз: insert для нового, update для отложенного
-      // (pending-запись уже занимает уникальный eventId).
       const recordEvent = async (status: string) => {
         const repo = queryRunner.manager.getRepository(WebhookEvent);
         if (existingEvent) {
@@ -177,6 +162,9 @@ export class OrdersService {
       await queryRunner.manager.save(order);
 
       await recordEvent('paid');
+
+      // Подтверждаем бронь
+      await this.bookingsService.confirm(order.id);
 
       const result = await this.deliverKey(order, queryRunner);
       await queryRunner.commitTransaction();
@@ -209,12 +197,6 @@ export class OrdersService {
     lockedOrder.deliveryAttempts = (lockedOrder.deliveryAttempts || 0) + 1;
     await queryRunner.manager.save(lockedOrder);
 
-    // Резервируем ровно ОДИН ключ товара: без LIMIT прежний массовый
-    // UPDATE помечал весь пул свободных ключей одним заказом. FOR UPDATE
-    // держит строку заблокированной до коммита, поэтому параллельный
-    // заказ после ожидания перепроверит условие isUsed=false (Read
-    // Committed) и возьмёт следующую свободную строку — ключ не выдаётся
-    // дважды и не теряется.
     const key = await queryRunner.manager
       .getRepository(KeyPool)
       .createQueryBuilder('kp')
@@ -237,6 +219,10 @@ export class OrdersService {
           status: 'failed',
           errorMessage: 'No keys available',
         });
+
+      // Эмитнуть что товар закончился
+      await this.productsService.notifyOutOfStock(order.productId);
+
       return queryRunner.manager.findOne(Order, { where: { id: order.id } }) as Promise<Order>;
     }
 

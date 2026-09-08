@@ -6,8 +6,9 @@ import { Order } from './entities/order.entity';
 import { PromoCode } from './entities/promo-code.entity';
 import { WebhookEvent } from './entities/webhook-event.entity';
 import { DeliveryLog } from './entities/delivery-log.entity';
+import { Booking } from '../bookings/entities/booking.entity';
 
-export const entities = [Product, KeyPool, Order, PromoCode, WebhookEvent, DeliveryLog];
+export const entities = [Product, KeyPool, Order, PromoCode, WebhookEvent, DeliveryLog, Booking];
 
 @Module({
   imports: [

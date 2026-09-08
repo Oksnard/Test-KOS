@@ -1,0 +1,27 @@
+{
+  "name": "test-kos",
+  "version": "1.0.0",
+  "description": "Веб-приложение для продажи игровых ключей и пополнений (Steam, Epic Games, Xbox, PlayStation, Razer Gold, Google Play и др.): витрина с каталогом, создание заказа, приём платежа, **моментальная автоматическая выдача ключа** и админ-панель для управления заказами и пулом ключей.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Oksnard/Test-KOS.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Oksnard/Test-KOS/issues"
+  },
+  "homepage": "https://github.com/Oksnard/Test-KOS#readme",
+  "devDependencies": {
+    "playwright": "^1.63.0"
+  },
+  "dependencies": {
+    "@playwright/test": "^1.63.0"
+  }
+}

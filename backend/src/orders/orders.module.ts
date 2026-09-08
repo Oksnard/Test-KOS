@@ -6,6 +6,8 @@ import { WebhookEvent } from '../database/entities/webhook-event.entity';
 import { DeliveryLog } from '../database/entities/delivery-log.entity';
 import { ProductsModule } from '../products/products.module';
 import { PromoCodesModule } from '../promo-codes/promo-codes.module';
+import { BookingsModule } from '../bookings/bookings.module';
+import { ShowroomModule } from '../showroom/showroom.module';
 import { OrdersController } from './orders.controller';
 import { OrdersService } from './orders.service';
 
@@ -14,6 +16,8 @@ import { OrdersService } from './orders.service';
     TypeOrmModule.forFeature([Order, KeyPool, WebhookEvent, DeliveryLog]),
     ProductsModule,
     PromoCodesModule,
+    BookingsModule,
+    ShowroomModule,
   ],
   controllers: [OrdersController],
   providers: [OrdersService],

@@ -1,4 +1,4 @@
-import { Controller, Get, Param, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Param, ParseIntPipe, Query } from '@nestjs/common';
 import { ProductsService } from './products.service';
 
 @Controller('api/products')
@@ -8,6 +8,28 @@ export class ProductsController {
   @Get()
   async findAll() {
     return this.productsService.findAll();
+  }
+
+  @Get('search')
+  async search(
+    @Query('q') query?: string,
+    @Query('category') category?: string,
+    @Query('service') service?: string,
+    @Query('minPrice') minPrice?: string,
+    @Query('maxPrice') maxPrice?: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    const result = await this.productsService.search({
+      query,
+      category,
+      service,
+      minPrice: minPrice ? parseFloat(minPrice) : undefined,
+      maxPrice: maxPrice ? parseFloat(maxPrice) : undefined,
+      limit: limit ? parseInt(limit, 10) : 48,
+      offset: offset ? parseInt(offset, 10) : 0,
+    });
+    return result;
   }
 
   @Get(':id')
